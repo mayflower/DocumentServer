@@ -159,7 +159,7 @@ target "web-apps" {
 target "server" {
   inherits   = ["_common"]
   context    = ".."
-  dockerfile = "./server/.docker/server.bake.Dockerfile"
+  dockerfile = "./build/.docker/server.bake.Dockerfile"
   tags       = ["${REGISTRY}/server:${TAG}"]
   cache-from = ["type=local,src=/tmp/${REGISTRY}/server"]
   cache-to   = ["type=local,dest=/tmp/${REGISTRY}/server,mode=max"]
