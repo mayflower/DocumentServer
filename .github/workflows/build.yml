@@ -50,7 +50,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY: ghcr.io/euro-office
+  REGISTRY: ghcr.io/mayflower
   IMAGE_NAME: documentserver
   CLUSTER_IMG_DOCS: cluster-docs
   CLUSTER_IMG_EXAMPLE: cluster-example
@@ -67,7 +67,7 @@ env:
 
 jobs:
   clone:
-    runs-on: ubuntu-latest
+    runs-on: mayflower-k8s-runners
     steps:
       - name: Checkout fork repository (with submodules)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -135,7 +135,7 @@ jobs:
   #              (euro-office → GitHub Release, nextcloud-office → SSH)
   # ─────────────────────────────────────────────────────────────
   build:
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    runs-on: mayflower-k8s-runners
     needs: clone
     permissions:
       contents: write
@@ -363,7 +363,7 @@ jobs:
   # (:latest + sanitised ref tag).
   # ─────────────────────────────────────────────────────────────
   manifest:
-    runs-on: ubuntu-latest
+    runs-on: mayflower-k8s-runners
     needs: build
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')
     permissions:
