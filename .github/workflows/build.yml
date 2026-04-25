@@ -7,9 +7,9 @@ on:
     tags:
       - '**'
   # PRs are expected from same-repo branches only. A fork PR gets a read-only
-  # GITHUB_TOKEN and no secrets, so the clone job's EURO_OFFICE_MIRROR_TOKEN
-  # (required to fetch private submodules + the brand repo) is empty and the
-  # build hard-fails before reaching the GHCR push. External contributions are
+  # GITHUB_TOKEN and no secrets, so the build job's EURO_OFFICE_MIRROR_TOKEN
+  # (required to fetch the brand repo) is empty and the build hard-fails
+  # before reaching the GHCR push. External contributions are
   # not supported by this mirror; pull_request_target is deliberately avoided
   # to keep secrets away from untrusted code.
   pull_request:
@@ -66,60 +66,6 @@ env:
   NEXTCLOUD_CLUSTER_IMG_UTILS: nextcloud-office-cluster-utils
 
 jobs:
-  clone:
-    runs-on: mayflower-k8s-runners
-    steps:
-      - name: Checkout fork repository (with submodules)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          path: .
-          submodules: recursive
-          token: ${{ github.token }}
-
-      - name: Checkout nextcloud-office-brand repo
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: Euro-Office/nextcloud-office-brand
-          path: build/brands/nextcloud-office-brand
-          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
-
-      - name: Align submodules to requested branches
-        shell: bash
-        env:
-          CORE_BRANCH:    ${{ github.event.inputs.core_branch || '' }}
-          SDKJS_BRANCH:   ${{ github.event.inputs.sdkjs_branch || '' }}
-          WEBAPPS_BRANCH: ${{ github.event.inputs.web_apps_branch || '' }}
-          SERVER_BRANCH:  ${{ github.event.inputs.server_branch || '' }}
-        run: |
-          set -euo pipefail
-
-          checkout_submodule() {
-            local path=$1
-            local branch=$2
-            echo "🔧 Updating $path → $branch"
-            pushd "$path" > /dev/null
-            git fetch origin "${branch}:${branch}"
-            git checkout "$branch"
-            popd > /dev/null
-          }
-
-          [ -n "$CORE_BRANCH" ]    && checkout_submodule core      "$CORE_BRANCH"
-          [ -n "$SDKJS_BRANCH" ]   && checkout_submodule sdkjs     "$SDKJS_BRANCH"
-          [ -n "$WEBAPPS_BRANCH" ] && checkout_submodule web-apps  "$WEBAPPS_BRANCH"
-          [ -n "$SERVER_BRANCH" ]  && checkout_submodule server    "$SERVER_BRANCH"
-
-          checkout_submodule dictionaries       "main"
-          checkout_submodule document-templates "main"
-
-          echo "--- Submodule state after alignment ---"
-          git submodule status
-
-      - name: Cache clones
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: "${{ github.workspace }}"
-          key: ${{ runner.os }}-build-${{ github.sha }}
-
   # ─────────────────────────────────────────────────────────────
   # BUILD
   #
@@ -139,7 +85,6 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   build:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'mayflower-k8s-runners' }}
-    needs: clone
     permissions:
       contents: write
       packages: write
@@ -168,11 +113,45 @@ jobs:
             cache_prefix: "nextcloud-office-"
 
     steps:
-      - name: Restore cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - name: Checkout fork repository (with submodules)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: "${{ github.workspace }}"
-          key: ${{ runner.os }}-build-${{ github.sha }}
+          submodules: recursive
+          token: ${{ github.token }}
+
+      - name: Checkout nextcloud-office-brand repo
+        if: matrix.brand.name == 'nextcloud-office'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Euro-Office/nextcloud-office-brand
+          path: build/brands/nextcloud-office-brand
+          token: ${{ secrets.EURO_OFFICE_MIRROR_TOKEN }}
+
+      - name: Align submodules to requested branches
+        shell: bash
+        env:
+          CORE_BRANCH:    ${{ github.event.inputs.core_branch || '' }}
+          SDKJS_BRANCH:   ${{ github.event.inputs.sdkjs_branch || '' }}
+          WEBAPPS_BRANCH: ${{ github.event.inputs.web_apps_branch || '' }}
+          SERVER_BRANCH:  ${{ github.event.inputs.server_branch || '' }}
+        run: |
+          set -euo pipefail
+          checkout_submodule() {
+            local path=$1
+            local branch=$2
+            echo "Updating $path -> $branch"
+            pushd "$path" > /dev/null
+            git fetch origin "${branch}:${branch}"
+            git checkout "$branch"
+            popd > /dev/null
+          }
+          [ -n "$CORE_BRANCH" ]    && checkout_submodule core      "$CORE_BRANCH"
+          [ -n "$SDKJS_BRANCH" ]   && checkout_submodule sdkjs     "$SDKJS_BRANCH"
+          [ -n "$WEBAPPS_BRANCH" ] && checkout_submodule web-apps  "$WEBAPPS_BRANCH"
+          [ -n "$SERVER_BRANCH" ]  && checkout_submodule server    "$SERVER_BRANCH"
+          checkout_submodule dictionaries       "main"
+          checkout_submodule document-templates "main"
+          git submodule status
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
