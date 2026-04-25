@@ -133,9 +133,12 @@ jobs:
   #   develop  → pushed on default branch only (:latest-dev)
   #   packages → never pushed; exported to local filesystem for release upload
   #              (euro-office → GitHub Release, nextcloud-office → SSH)
+  #
+  # Each architecture is built on a native runner (amd64 → mayflower-k8s-runners,
+  # arm64 → ubuntu-24.04-arm) so no qemu emulation is involved.
   # ─────────────────────────────────────────────────────────────
   build:
-    runs-on: mayflower-k8s-runners
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'mayflower-k8s-runners' }}
     needs: clone
     permissions:
       contents: write
