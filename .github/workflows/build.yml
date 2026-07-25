@@ -41,9 +41,8 @@ on:
         type: boolean
 
 # Serialise runs per ref so a re-pushed PR cancels its in-flight run instead of
-# racing the previous one on the single self-hosted e2e runner (shared host
-# port + container name). Cross-PR collisions are still possible if two PRs run
-# at once; the e2e job assumes a single runner.
+# racing the previous one on the e2e runner (shared host port + container
+# name). Cross-PR collisions are still possible if two PRs run at once.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -342,7 +341,7 @@ jobs:
           fi
 
   e2e:
-    runs-on: self-hosted
+    runs-on: mayflower-k8s-runners
     # Depend on build (produces the image) and manifest (multi-arch tags on
     # main/tags). manifest is skipped on pull_request, so don't require it there.
     needs: [build, manifest]
